@@ -13,9 +13,6 @@ import java.awt.image.BufferedImage;
 import java.io.*;
 import java.util.*;
 
-import WizardTD.GameConfig.Monster;
-import WizardTD.GameConfig.Wave;
-
 public class App extends PApplet {
 
     public static final int CELLSIZE = 32;
@@ -31,16 +28,15 @@ public class App extends PApplet {
     public String configPath;
 
     public Random random = new Random();
-
-    private GameConfig gameConfig;
-    private Player player;
-    private List<Enemy> enemies = new ArrayList<>();
     
-    // Feel free to add any additional methods or attributes you want. Please put classes in different files.
-
     public App() {
         this.configPath = "config.json";
     }
+    // Feel free to add any additional methods or attributes you want. Please put classes in different files.
+    private GameConfig gameConfig;
+    private Player player;
+    private List<Monster> monsters;
+    private String[][] mapLayout;
 
     /**
      * Initialise the setting of the window size.
@@ -51,7 +47,7 @@ public class App extends PApplet {
     }
 
     /**
-     * Load all resources such as images. Initialise the elements such as the player, enemies and map elements.
+     * Load all resources such as images. Initialise the elements such as the player, monsters and map elements.
      */
 	@Override
     public void setup() {
@@ -66,7 +62,6 @@ public class App extends PApplet {
         PImage gremlinImage2 = loadImage("src/main/resources/WizardTD/gremlin2.png");
         PImage gremlinImage3 = loadImage("src/main/resources/WizardTD/gremlin3.png");
         PImage gremlinImage4 = loadImage("src/main/resources/WizardTD/gremlin4.png");
-        PImage gremlinImage5 = loadImage("src/main/resources/WizardTD/gremlin5.png");
         PImage pathImage0 = loadImage("src/main/resources/WizardTD/path0.png");
         PImage pathImage1 = loadImage("src/main/resources/WizardTD/path1.png");
         PImage pathImage2 = loadImage("src/main/resources/WizardTD/path2.png");
@@ -78,10 +73,21 @@ public class App extends PApplet {
         PImage wizardHouseImage = loadImage("src/main/resources/WizardTD/wizard_house.png");
         PImage wormImage = loadImage("src/main/resources/WizardTD/worm.png");
 
-        
+        // Load the map layout from the file
+        private String[][] loadMapLayout(String filename) {
+            String[] lines = loadStrings(filename);
+            String[][] layout = new String[lines.length][BOARD_WIDTH]; // Assuming BOARD_WIDTH is the width of the map
+            for (int i = 0; i < lines.length; i++) {
+                for (int j = 0; j < lines[i].length(); j++) {
+                    layout[i][j] = Character.toString(lines[i].charAt(j));
+                }
+            }
+            return layout;
+        }
+        mapLayout = loadMapLayout("level2.txt");
+
         // Load config.json
-        JSONObject configJSON = loadJSONObject(configPath);
-        gameConfig = new GameConfig(configJSON);
+        gameConfig = new GameConfig(loadJSONObject(configPath));
 
         String layout = gameConfig.layout;
         int initialTowerRange = gameConfig.initialTowerRange;
@@ -96,29 +102,41 @@ public class App extends PApplet {
         float manaPoolSpellCapMultiplier = gameConfig.manaPoolSpellCapMultiplier;
         float manaPoolSpellManaGainedMultiplier = gameConfig.manaPoolSpellManaGainedMultiplier;
 
-        for (Wave wave : gameConfig.waves) {
-            for (Monster monster : wave.monsters) {
-                PImage enemyImage = null;
-                switch (monster.type) {
+        player = new Player(gameConfig.initialMana, gameConfig.initialManaCap, gameConfig.initialManaGainedPerSecond);
+
+        monsters = new ArrayList<>();
+
+        for (GameConfig.Wave wave : gameConfig.getWaves()) {
+            for (GameConfig.Wave.Monster monster : wave.monsters) {
+                String type = monster.type;
+                int hp = monster.hp;
+                float speed = monster.speed;
+                float armour = monster.armour;
+                int manaGainedOnKill = monster.manaGainedOnKill;
+                int quantity = monster.quantity;
+                PImage image = null;
+                switch (type) {
                     case "gremlin":
-                        enemyImage = loadImage("src/main/resources/WizardTD/gremlin.png");
+                        image = gremlinImage;
                         break;
                     case "gremlin1":
-                        enemyImage = loadImage("src/main/resources/WizardTD/gremlin1.png");
+                        image = gremlinImage1;
                         break;
                     case "gremlin2":
-                        enemyImage = loadImage("src/main/resources/WizardTD/gremlin2.png");
+                        image = gremlinImage2;
                         break;
-                    // ... [其他敌人类型的图片加载代码]
+                    case "gremlin3":
+                        image = gremlinImage3;
+                        break;
+                    case "gremlin4":
+                        image = gremlinImage4;
+                        break;
                 }
-                for (int i = 0; i < monster.quantity; i++) {
-                    Enemy enemy = new Enemy(monster.type, monster.hp, monster.speed, monster.armour, monster.manaGainedOnKill, enemyImage);
-                    enemies.add(enemy);
+                for (int i = 0; i < quantity; i++) {
+                    monsters.add(new Monster(type, hp, speed, armour, manaGainedOnKill, image));
                 }
             }
         }
-
-        player = new Player(gameConfig.initialMana, gameConfig.initialManaCap, gameConfig.initialManaGainedPerSecond);
 
     }
 
@@ -158,7 +176,25 @@ public class App extends PApplet {
      */
 	@Override
     public void draw() {
- 
+
+
+        for (Iterator<Monster> iterator = monsters.iterator(); iterator.hasNext();) {
+            Monster monster = iterator.next();
+            monster.move();
+            
+            image(monster.getImage(), monster.getCurrentX() * CELLSIZE, monster.getCurrentY() * CELLSIZE);
+    
+            if (monster.getHp() <= 0) {
+                iterator.remove();
+            }
+        }
+
+        // Update and display the player's info
+        player.gainMana();
+        fill(255); 
+        textSize(16); 
+        text("Mana: " + player.getMana(), 10, 20);
+
     }
 
     public static void main(String[] args) {
